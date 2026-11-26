@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de circuitos neumáticos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: alegre y de taller, como los paneles de prácticas de colores del aula
+   IDEA: un banco de neumática: el esquema ISO cobra vida, el aire a presión se ve en azul intenso
+   PICTURE: el esquema animado grande, válvulas amarillas, vástago naranja, aire azul, escapes rojos
+   COLOUR and TYPE: amarillo vivo de fondo, cada circuito con su color propio; Inter Tight + Inter
+   LAYOUT: pestañas arriba, esquema a la izquierda (60%), mandos y explicación a la derecha; se apila en móvil */
+:root{color-scheme:light dark;
+ --bg:light-dark(#ffd60a,#1b1a10);--panel:light-dark(#ffffff,#202227);--ink:light-dark(#121418,#eef1f4);
+ --soft:light-dark(#4d5560,#a8b0ba);--line:light-dark(#e2d48a,#3a3d44);--air:light-dark(#0084ff,#3ea6ff);
+ --airfill:light-dark(rgba(0,132,255,.32),rgba(62,166,255,.38));--alarm:#ff2d2d;--c:#ff3b30;
+ --vfill:light-dark(#fff6c7,#3a3520);--cyl:light-dark(#eef3f8,#2b3038);--rod:#ff7a00;--load:#ff2d55;--exh:#ff2d2d;--src:#16c45a}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip}
+header{padding:22px max(4vw,16px) 6px}
+h1 .dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;background:var(--air);margin-right:.25em;box-shadow:.7em 0 0 var(--rod),1.4em 0 0 var(--load);margin-right:1.6em;vertical-align:.08em}
+h1{font:700 clamp(26px,4vw,40px)/1.05 "Inter Tight",Inter,sans-serif;margin:0 0 6px;text-wrap:balance}
+.sub{margin:0;color:light-dark(#3a3000,#c9c2a0);max-width:70ch;font-weight:500}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:14px max(4vw,16px) 0;scrollbar-width:thin}
+.tabs button{flex:none;font:700 14px Inter,sans-serif;padding:10px 14px;min-height:44px;border:none;border-top:5px solid var(--tc);border-radius:10px 10px 0 0;background:var(--panel);color:var(--ink);cursor:pointer;opacity:.85}
+.tabs button:hover{opacity:1}
+.tabs button[aria-selected=true]{background:var(--tc);color:#fff;opacity:1}
+.tabs button span{display:block;font-weight:500;font-size:12px;color:inherit;opacity:.85}
+.tabs button:focus-visible,.ctrl button:focus-visible,input:focus-visible{outline:3px solid var(--air);outline-offset:2px}
+main{margin:0 max(4vw,16px) 28px;background:var(--panel);border-radius:0 12px 12px 12px;border-top:6px solid var(--c);box-shadow:0 10px 0 light-dark(rgba(0,0,0,.08),rgba(0,0,0,.3));display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:0}
+.fig{padding:18px;border-right:1px solid var(--line)}
+.fig svg{width:100%;height:auto;display:block}
+aside{padding:20px 22px 24px}
+aside h2{font:700 24px/1.1 "Inter Tight",Inter,sans-serif;margin:0 0 4px;color:var(--c)}
+.ej{color:var(--soft);margin:0 0 14px}
+.how{margin:0 0 14px;padding-left:18px}
+.how li{margin-bottom:4px}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 16px}
+.ctrl button{font:700 15px Inter,sans-serif;min-height:52px;padding:10px 20px;border-radius:999px;border:3px solid var(--c);background:var(--panel);color:var(--c);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 5px 0 var(--c);transition:transform .06s,box-shadow .06s}
+.ctrl button.on{background:var(--c);color:#fff;transform:translateY(4px);box-shadow:0 1px 0 var(--c)}
+.slider{margin:0 0 16px}
+.slider label{font-weight:600;display:flex;justify-content:space-between}
+.slider input{width:100%;height:32px;accent-color:var(--c)}
+.estado{border-left:6px solid var(--c);background:color-mix(in srgb,var(--c) 13%,var(--panel));padding:10px 12px;border-radius:0 8px 8px 0;margin:0 0 14px;min-height:76px}
+.estado b{display:block;font-size:13px;color:var(--soft);font-weight:600}
+.leg{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--soft)}
+.leg i{display:inline-block;width:22px;height:0;border-top:3px solid var(--air);vertical-align:middle;margin-right:6px}
+.leg i.n{border-top:1.6px solid var(--ink)}.leg i.r{border:none;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:11px solid var(--exh)}.leg i.d{border-top:2px dashed var(--ink)}
+@media(max-width:860px){main{grid-template-columns:minmax(0,1fr)}.fig{border-right:none;border-bottom:1px solid var(--line);padding:10px}}
+</style>
+</head>
+<body>
+<header>
+<h1><span class="dot"></span>Simulador de circuitos neumáticos</h1>
+<p class="sub">Los 7 circuitos de los apuntes de 4.º ESO. Acciona los mandos y mira cómo cambian las válvulas, por dónde va el aire a presión y cómo se mueve el cilindro.</p>
+</header>
+<nav class="tabs" role="tablist" id="tabs"></nav>
+<main>
+ <div class="fig"><svg id="sv" viewBox="0 0 760 400" role="img" aria-label="Esquema del circuito"></svg></div>
+ <aside>
+  <h2 id="nm"></h2>
+  <p class="ej" id="ej"></p>
+  <ol class="how" id="how"></ol>
+  <div class="ctrl" id="ctrl"></div>
+  <div class="slider" id="sl" hidden><label for="reg"><span>Apertura del regulador 1.02</span><span id="regv"></span></label><input type="range" id="reg" min="10" max="100" step="5" value="35"></div>
+  <div class="estado" aria-live="polite"><b>Qué está pasando</b><span id="st"></span></div>
+  <div class="leg"><span><i></i>Aire a presión</span><span><i class="n"></i>Sin presión</span><span><i class="d"></i>Pilotaje</span><span><i class="r"></i>Escape</span></div>
+ </aside>
+</main>
+<script>
+{
+const A='var(--air)',K='var(--ink)',PN='var(--panel)';
+const L=(p,on,d)=>`<polyline points="${p}" fill="none" stroke="${on?A:K}" stroke-width="${on?4:1.6}" stroke-linejoin="round"${d?' stroke-dasharray="6 4"':''}/>`;
+const ar=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${K}" stroke-width="1.4" marker-end="url(#ah)"/>`;
+const tee=(x,y)=>`<path d="M${x} ${y}V${y-10}M${x-6} ${y-10}H${x+6}" stroke="${K}" stroke-width="1.4" fill="none"/>`;
+const exh=(x,y)=>`<line x1="${x}" y1="${y}" x2="${x}" y2="${y+8}" stroke="${K}" stroke-width="1.4"/><path d="M${x-6} ${y+8}H${x+6}L${x} ${y+18}Z" fill="var(--exh)" stroke="var(--exh)" stroke-width="1.4"/>`;
+const spr=(x,y)=>`<path d="M${x} ${y}l3 -6l6 12l6 -12l6 12l3 -6" fill="none" stroke="#16a34a" stroke-width="2"/>`;
+const src=(x,y)=>`<circle cx="${x}" cy="${y}" r="9" fill="var(--src)" stroke="${A}" stroke-width="2.5"/><circle cx="${x}" cy="${y}" r="3" fill="#fff"/>`;
+const tx=(x,y,t,a='start',w=600,c=K,s=12.5)=>`<text x="${x}" y="${y}" text-anchor="${a}" font-weight="${w}" font-size="${s}" fill="${c}" font-family="Inter,sans-serif">${t}</text>`;
+const sq=(x,y,w)=>`<rect x="${x}" y="${y}" width="${w}" height="36" fill="var(--vfill)" stroke="${K}" stroke-width="1.4"/>`;
+const tri=(x,y,dir)=>`<path d="M${x-12*dir} ${y-6}L${x} ${y}L${x-12*dir} ${y+6}Z" fill="${PN}" stroke="${K}" stroke-width="1.4"/>`;
+function act(kind,x,y){
+ if(kind==='push')return `<path d="M${x} ${y}H${x-10}M${x-10} ${y-8}A8 8 0 0 0 ${x-10} ${y+8}" fill="none" stroke="${K}" stroke-width="1.4"/>`;
+ if(kind==='lever')return `<path d="M${x} ${y}H${x-12}M${x-12} ${y}L${x-20} ${y-14}" fill="none" stroke="${K}" stroke-width="1.4"/><circle cx="${x-20}" cy="${y-14}" r="2.5" fill="${K}"/>`;
+ if(kind==='roller')return `<line x1="${x}" y1="${y}" x2="${x-10}" y2="${y}" stroke="${K}" stroke-width="1.4"/><circle cx="${x-16}" cy="${y}" r="6" fill="${PN}" stroke="${K}" stroke-width="1.4"/>`;
+ if(kind==='pilot')return tri(x,y,1);
+ return '';
+}
+// válvula 3/2 NC: las vías (2 arriba, 1 abajo, 3 escape) están fijas en el cuadro derecho; al accionarla el cuerpo se desplaza 36
+function v32(x0,y0,on,left){
+ const s=x0+36,b=y0+36,d=on?36:0;
+ return `<g transform="translate(${d},0)">${sq(x0,y0,36)}${sq(s,y0,36)}${ar(x0+12,b,x0+12,y0+2)}${tee(x0+24,b)}${ar(s+12,y0,s+23,b-2)}${tee(s+12,b)}${act(left,x0,y0+18)}${spr(s+36,y0+18)}</g>${exh(s+24,b)}`;
+}
+// válvula 5/2: vías 4 y 2 arriba, 5-1-3 abajo, fijas en el cuadro derecho; al accionarla el cuerpo se desplaza 48
+function v52(x0,y0,on,left,right){
+ const s=x0+48,b=y0+36,d=on?48:0;
+ const r=right==='spring'?spr(s+48,y0+18):tri(s+48,y0+18,-1);
+ return `<g transform="translate(${d},0)">${sq(x0,y0,48)}${sq(s,y0,48)}${ar(x0+24,b,x0+13,y0+2)}${ar(x0+36,y0,x0+39,b-2)}${tee(x0+8,b)}${ar(s+24,b,s+35,y0+2)}${ar(s+12,y0,s+9,b-2)}${tee(s+40,b)}${act(left,x0,y0+18)}${r}</g>${exh(s+8,b)}${exh(s+40,b)}`;
+}
+// cilindro: x,y esquina; pos 0..1; capP / rodP = cámaras con aire
+function cyl(x,y,dbl,pos,capP,rodP){
+ const px=x+24+pos*86;let o=`<rect x="${x}" y="${y}" width="140" height="26" fill="var(--cyl)"/>`;
+ if(capP)o+=`<rect x="${x}" y="${y}" width="${px-x}" height="26" fill="var(--airfill)"/>`;
+ if(rodP)o+=`<rect x="${px}" y="${y}" width="${x+140-px}" height="26" fill="var(--airfill)"/>`;
+ o+=`<rect x="${x}" y="${y}" width="140" height="26" fill="none" stroke="${K}" stroke-width="1.6"/>`;
+ if(!dbl){const w=x+136-(px+4),st=w/8;let d=`M${px+4} ${y+13}l${st/2} -8`;for(let i=0;i<7;i++)d+=`l${st} ${i%2?-16:16}`;d+=`l${st/2} -8`;o+=`<path d="${d}" fill="none" stroke="#16a34a" stroke-width="1.8"/>`;}
+ o+=`<rect x="${px}" y="${y+10}" width="130" height="6" fill="var(--rod)"/><rect x="${px-3}" y="${y}" width="7" height="26" fill="var(--rod)"/><rect x="${px+130}" y="${y-8}" width="12" height="42" rx="3" fill="var(--load)"/>`;
+ return o;
+}
+const COL=['#ff3b30','#ff8a00','#18b84a','#0a84ff','#b04ee0','#ff2d92','#00b8b0'];
+const S=[0,1,2,3,4,5,6].map(()=>({pos:0,b:{},reg:35,bist:0}));
+const C=[
+{n:'Circuito 1',t:'Simple efecto con 3/2',vb:'100 50 370 225',
+ ej:'Ejemplo real: un expulsor que saca cajas de una cinta.',
+ how:['Mantén apretado el pulsador de la válvula 1.1: la válvula cambia de posición.','Suéltalo: el muelle de la válvula y el del cilindro lo devuelven todo a reposo.'],
+ c:[{id:'p',l:'Pulsador 1.1',m:'hold'}],
+ up(s){s.a=!!s.b.p;return {t:s.a?1:0,v:.9};},
+ draw(s){return cyl(196,80,false,s.pos,s.a,false)+L('208,106 208,170',s.a)+v32(160,170,s.a,'push')+L('208,206 208,240',1)+src(208,248)+tx(186,98,'1.0','end')+tx(126,192,'1.1','end')+tx(194,252,'0.1','end')+tx(222,252,'aire a presión','start',400,'var(--soft)')+tx(214,160,'2','start',400,'var(--soft)',11);},
+ st(s){return s.a?'La válvula 3/2 está accionada: el aire pasa de 1 a 2, llena la cámara del cilindro y empuja el émbolo. El vástago sale.':s.pos>.01?'Has soltado el pulsador: el aire del cilindro escapa por 3 y el muelle devuelve el vástago.':'Reposo: la 3/2 está cerrada (NC), el cilindro no tiene aire y el muelle mantiene el vástago dentro.';}},
+{n:'Circuito 2',t:'Doble efecto con 5/2',vb:'270 50 380 200',
+ ej:'Ejemplo real: abrir y cerrar la compuerta de una tolva.',
+ how:['Mantén accionada la palanca: el aire va de 1 a 4 y el vástago sale.','Suéltala: el muelle devuelve la válvula, el aire va de 1 a 2 y el vástago entra con fuerza.'],
+ c:[{id:'p',l:'Palanca 1.1',m:'hold'}],
+ up(s){s.a=!!s.b.p;return {t:s.a?1:0,v:.9};},
+ draw(s){return cyl(378,70,true,s.pos,s.a,!s.a)+L('390,150 390,96',s.a)+L('414,150 414,124 506,124 506,96',!s.a)+v52(330,150,s.a,'lever','spring')+L('402,186 402,218',1)+src(402,226)+tx(370,88,'1.0','end')+tx(300,204,'1.1','end')+tx(384,144,'4','end',400,'var(--soft)',11)+tx(420,144,'2','start',400,'var(--soft)',11);},
+ st(s){return s.a?'Palanca accionada: el aire entra por detrás del émbolo (1→4) y el lado del vástago se vacía por 2→3. El vástago sale.':'Palanca en reposo: el aire entra por el lado del vástago (1→2) y la otra cámara se vacía por 4→5. El vástago está dentro, sujeto con aire.';}},
+{n:'Circuito 3',t:'Regular la velocidad',vb:'270 20 380 230',sl:true,
+ ej:'Ejemplo real: una puerta de autobús que se cierra despacio.',
+ how:['Mueve el control de apertura del regulador 1.02.','Mantén la palanca: el vástago sale más o menos rápido según el regulador.','Suéltala: vuelve rápido, porque el aire entra libre por la antirretorno.'],
+ c:[{id:'p',l:'Palanca 1.1',m:'hold'}],
+ up(s){s.a=!!s.b.p;return {t:s.a?1:0,v:s.a?.9*s.reg/100:.9};},
+ draw(s){const g=6-4*(s.reg/100),x=506,y=101;
+  const reg=`<rect x="${x-26}" y="${y-24}" width="56" height="48" rx="4" fill="none" stroke="var(--soft)" stroke-dasharray="4 3"/><path d="M${x-g} ${y-10}Q${x-1} ${y} ${x-g} ${y+10}M${x+g} ${y-10}Q${x+1} ${y} ${x+g} ${y+10}" fill="none" stroke="${K}" stroke-width="1.5"/>${ar(x-12,y+14,x+10,y-14)}<path d="M${x} ${y-18}H${x+18}V${y+18}H${x}" fill="none" stroke="${K}" stroke-width="1.4"/><circle cx="${x+18}" cy="${s.a?y-4:y-9}" r="4" fill="${PN}" stroke="${K}" stroke-width="1.4"/><path d="M${x+12} ${y}L${x+18} ${y+6}L${x+24} ${y}" fill="none" stroke="${K}" stroke-width="1.4"/>`;
+  return cyl(378,40,true,s.pos,s.a,!s.a)+L('390,150 390,66',s.a)+L('414,150 414,136 506,136 506,66',!s.a)+reg+v52(330,150,s.a,'lever','spring')+L('402,186 402,218',1)+src(402,226)+tx(370,58,'1.0','end')+tx(300,204,'1.1','end')+tx(540,98,'1.02')+tx(540,114,'regulador','start',400,'var(--soft)',11);},
+ st(s){return s.a?(s.pos<.99?`El vástago sale. El aire que sale del lado del vástago tiene que pasar por el estrechamiento del regulador (abierto al ${s.reg} %), por eso va despacio.`:'El vástago ha llegado al final de su recorrido.'):(s.pos>.01?'El vástago vuelve rápido: el aire entra por 2 y pasa libre por la válvula antirretorno del regulador.':'Reposo: el vástago está dentro. Acciona la palanca para ver la salida frenada.');}},
+{n:'Circuito 4',t:'Mando indirecto',vb:'70 50 570 280',
+ ej:'Ejemplo real: una prensa grande mandada desde una cabina lejana.',
+ how:['Mantén el pulsador 1.2: sale aire por el tubo fino de pilotaje.','Ese aire cambia la válvula grande 1.1, que manda el aire al cilindro.'],
+ c:[{id:'p',l:'Pulsador 1.2',m:'hold'}],
+ up(s){s.a=!!s.b.p;return {t:s.a?1:0,v:.9};},
+ draw(s){const d=s.a?48:0;return cyl(378,70,true,s.pos,s.a,!s.a)+L('390,150 390,96',s.a)+L('414,150 414,124 506,124 506,96',!s.a)+L(`188,240 188,168 ${318+d},168`,s.a,1)+v52(330,150,s.a,'pilot','spring')+L('402,186 402,218',1)+src(402,226)+v32(140,240,s.a,'push')+L('188,276 188,300',1)+src(188,308)+tx(370,88,'1.0','end')+tx(318,212,'1.1','end')+tx(112,262,'1.2','end')+tx(250,160,'pilotaje','middle',400,'var(--soft)',11);},
+ st(s){return s.a?'Pulsador 1.2 apretado: el aire de pilotaje (azul discontinuo) empuja la válvula 1.1, que cambia y manda aire de 1 a 4. El vástago sale.':'Pulsador suelto: no hay aire de pilotaje y el muelle mantiene la 1.1 en reposo. El vástago está dentro.';}},
+{n:'Circuito 5',t:'Función Y (dos manos)',vb:'40 50 600 340',
+ ej:'Ejemplo real: una guillotina o una prensa con mando a dos manos.',
+ how:['Pulsa cada botón para dejarlo apretado o soltarlo.','Comprueba que el cilindro solo sale con los dos apretados.'],
+ c:[{id:'a',l:'Pulsador 1.2',m:'toggle'},{id:'b',l:'Pulsador 1.4',m:'toggle'}],
+ up(s){s.A=!!s.b.a;s.B=!!s.b.b;s.o=s.A&&s.B;return {t:s.o?1:0,v:.9};},
+ draw(s){return logic(s,'Y');},
+ st(s){return s.o?'Los dos pulsadores están apretados: la válvula de simultaneidad deja pasar el aire y el cilindro sale.':(s.A||s.B)?`Solo está apretado el pulsador ${s.A?'1.2':'1.4'}: la válvula de simultaneidad bloquea el aire. El cilindro no sale.`:'Ningún pulsador apretado. Pulsa los dos.';}},
+{n:'Circuito 6',t:'Función O (dos sitios)',vb:'40 50 600 340',
+ ej:'Ejemplo real: una puerta que se abre desde dentro o desde fuera.',
+ how:['Pulsa cada botón para dejarlo apretado o soltarlo.','Comprueba que basta con uno de los dos para que el cilindro salga.'],
+ c:[{id:'a',l:'Pulsador 1.2 (fuera)',m:'toggle'},{id:'b',l:'Pulsador 1.4 (dentro)',m:'toggle'}],
+ up(s){s.A=!!s.b.a;s.B=!!s.b.b;s.o=s.A||s.B;return {t:s.o?1:0,v:.9};},
+ draw(s){return logic(s,'O');},
+ st(s){return s.o?(s.A&&s.B?'Los dos pulsadores están apretados: la selectora deja pasar el aire y el cilindro sale.':`Pulsador ${s.A?'1.2':'1.4'} apretado: la bola de la selectora tapa la otra entrada para que el aire no se escape, y lo manda a la 1.1. El cilindro sale.`):'Ningún pulsador apretado: el cilindro está dentro.';}},
+{n:'Circuito 7',t:'Retorno automático',vb:'70 40 610 290',
+ ej:'Ejemplo real: un empujador que saca un bote y vuelve solo.',
+ how:['Da un toque al pulsador de marcha 1.2 (mantener y soltar).','La biestable 1.1 se queda en su sitio: el vástago sale aunque sueltes.','Al llegar al final pisa el rodillo 1.3 y vuelve solo.'],
+ c:[{id:'p',l:'Marcha 1.2',m:'hold'}],
+ up(s){s.P=!!s.b.p;s.R=s.pos>=.97;if(s.R)s.bist=0;else if(s.P)s.bist=1;return {t:s.bist,v:.7};},
+ draw(s){const d=s.bist?48:0;return cyl(378,70,true,s.pos,!!s.bist,!s.bist)+L('390,150 390,96',!!s.bist)+L('414,150 414,124 506,124 506,96',!s.bist)+
+  L(`188,240 188,168 ${318+d},168`,s.P,1)+L(`608,240 608,168 ${438+d},168`,s.R,1)+v52(330,150,!!s.bist,'pilot','pilot')+L('402,186 402,218',1)+src(402,226)+
+  v32(140,240,s.P,'push')+L('188,276 188,300',1)+src(188,308)+v32(560,240,s.R,'roller')+L('608,276 608,300',1)+src(608,308)+
+  `<line x1="630" y1="58" x2="630" y2="110" stroke="var(--alarm)" stroke-width="2" stroke-dasharray="3 3"/>`+tx(636,62,'1.3','start',600,'var(--alarm)')+tx(636,78,'rodillo','start',400,'var(--soft)',11)+
+  tx(370,88,'1.0','end')+tx(318,212,'1.1','end')+tx(112,262,'1.2','end')+tx(526,262,'1.3','end')+tx(318,160,'14','end',400,'var(--soft)',11)+tx(450,160,'12','start',400,'var(--soft)',11);},
+ st(s){return s.R?'El vástago ha pisado el rodillo 1.3: llega aire de pilotaje a la vía 12 y la biestable cambia. El vástago vuelve solo.':s.bist?(s.P?'Marcha apretada: aire de pilotaje por 14, la biestable cambia y el vástago sale.':'Has soltado la marcha, pero la biestable se queda en esa posición (tiene memoria). El vástago sigue saliendo.'):(s.pos>.01?'El vástago vuelve a la posición inicial.':'Reposo: el vástago está dentro. Da un toque a marcha.');}}
+];
+function logic(s,k){
+ const d=s.o?48:0;let g='';
+ if(k==='Y')g=`<rect x="270" y="238" width="60" height="24" fill="${PN}" stroke="${K}" stroke-width="1.4"/><rect x="${288+(s.A&&!s.B?6:!s.A&&s.B?-6:0)}" y="244" width="24" height="12" fill="${PN}" stroke="${K}" stroke-width="1.4"/>`;
+ else{const bx=s.A&&!s.B?314:!s.A&&s.B?286:300;g=`<rect x="270" y="238" width="60" height="24" fill="${PN}" stroke="${K}" stroke-width="1.4"/><path d="M280 242L287 250L280 258M320 242L313 250L320 258" fill="none" stroke="${K}" stroke-width="1.4"/><circle cx="${bx}" cy="250" r="6" fill="${K}"/>`;}
+ return cyl(378,70,true,s.pos,s.o,!s.o)+L('390,150 390,96',s.o)+L('414,150 414,124 506,124 506,96',!s.o)+
+  L('148,300 148,250 270,250',s.A,1)+L('488,300 488,250 330,250',s.B,1)+L(`300,238 300,168 ${318+d},168`,s.o,1)+g+
+  v52(330,150,s.o,'pilot','spring')+L('402,186 402,218',1)+src(402,226)+
+  v32(100,300,s.A,'push')+L('148,336 148,360',1)+src(148,368)+v32(440,300,s.B,'push')+L('488,336 488,360',1)+src(488,368)+
+  tx(370,88,'1.0','end')+tx(326,146,'1.1','end')+tx(300,284,'1.6','middle')+tx(300,298,k==='Y'?'simultaneidad (Y)':'selectora (O)','middle',400,'var(--soft)',11)+tx(72,322,'1.2','end')+tx(412,322,'1.4','end');
+}
+const $=id=>document.getElementById(id);
+const defs='<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>';
+let tab=0;try{const h=location.hash.match(/^#circuito-([1-7])$/);if(h)tab=+h[1]-1;}catch(e){}
+$('tabs').innerHTML=C.map((c,i)=>`<button role="tab" id="t${i}" style="--tc:${COL[i]}" aria-selected="${i===tab}">${c.n}<span>${c.t}</span></button>`).join('');
+function setTab(i){tab=i;document.documentElement.style.setProperty('--c',COL[i]);C.forEach((c,j)=>$('t'+j).setAttribute('aria-selected',j===i));const c=C[i],s=S[i];
+ $('nm').textContent=`${c.n} · ${c.t}`;$('ej').textContent=c.ej;$('how').innerHTML=c.how.map(h=>`<li>${h}</li>`).join('');
+ $('sv').setAttribute('viewBox',c.vb);
+ $('ctrl').innerHTML=c.c.map(b=>`<button data-id="${b.id}" data-m="${b.m}" class="${s.b[b.id]?'on':''}" aria-pressed="${!!s.b[b.id]}">${b.l}${b.m==='hold'?' · mantener':''}</button>`).join('');
+ $('sl').hidden=!c.sl;$('reg').value=s.reg;$('regv').textContent=s.reg+' %';
+ try{history.replaceState(null,'','#circuito-'+(i+1));}catch(e){}}
+C.forEach((c,i)=>$('t'+i).addEventListener('click',()=>setTab(i)));
+const press=(btn,v)=>{const s=S[tab];s.b[btn.dataset.id]=v;btn.classList.toggle('on',v);btn.setAttribute('aria-pressed',v);};
+const ctrl=$('ctrl');
+ctrl.addEventListener('pointerdown',e=>{const b=e.target.closest('button');if(!b)return;e.preventDefault();
+ if(b.dataset.m==='hold'){press(b,true);try{b.setPointerCapture(e.pointerId);}catch(x){}}else press(b,!S[tab].b[b.dataset.id]);});
+['pointerup','pointercancel','lostpointercapture'].forEach(ev=>ctrl.addEventListener(ev,e=>{const b=e.target.closest('button');if(b&&b.dataset.m==='hold')press(b,false);}));
+ctrl.addEventListener('keydown',e=>{const b=e.target.closest('button');if(!b||(e.key!==' '&&e.key!=='Enter')||e.repeat)return;e.preventDefault();b.dataset.m==='hold'?press(b,true):press(b,!S[tab].b[b.dataset.id]);});
+ctrl.addEventListener('keyup',e=>{const b=e.target.closest('button');if(b&&b.dataset.m==='hold'&&(e.key===' '||e.key==='Enter'))press(b,false);});
+ctrl.addEventListener('contextmenu',e=>e.preventDefault());
+$('reg').addEventListener('input',e=>{S[tab].reg=+e.target.value;$('regv').textContent=e.target.value+' %';});
+let last=performance.now(),lastSt='';
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+ for(let i=0;i<C.length;i++){const s=S[i],r=C[i].up(s);const v=r.v*dt;s.pos+=Math.max(-v,Math.min(v,r.t-s.pos));}
+ const c=C[tab],s=S[tab];
+ $('sv').innerHTML=defs+c.draw(s);
+ const t=c.st(s);if(t!==lastSt){$('st').textContent=t;lastSt=t;}
+ requestAnimationFrame(frame);}
+setTab(tab);requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
